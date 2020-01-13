@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.29613.14
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TerraformStateToHcl", "TerraformStateToHcl.csproj", "{AAF4F84A-ACB5-4C96-B378-F53D3B6B331F}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{AAF4F84A-ACB5-4C96-B378-F53D3B6B331F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AAF4F84A-ACB5-4C96-B378-F53D3B6B331F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AAF4F84A-ACB5-4C96-B378-F53D3B6B331F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AAF4F84A-ACB5-4C96-B378-F53D3B6B331F}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {D6C897E0-859F-4BDF-B1BE-5EF4EA1A5442}
+	EndGlobalSection
+EndGlobal
