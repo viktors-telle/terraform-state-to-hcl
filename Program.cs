@@ -124,7 +124,10 @@ namespace TerraformStateToHcl
                     {
                         var property = (JProperty) token;
 
-                        if (property.Children().Any(c => c.Type == JTokenType.Array && c.Children().Any(cc => !SimpleTypes.Contains(cc.Type))))
+                        if (property
+                            .Children()
+                            .Any(c => c.Type == JTokenType.Array && c.Children()
+                                          .Any(cc => !SimpleTypes.Contains(cc.Type))))
                         {
                             sb.AppendLine($"{property.Name} {{");
 
