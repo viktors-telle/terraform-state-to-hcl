@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Data;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -13,12 +12,35 @@ namespace TerraformStateToHcl
     {
         private const string OutputDirectoryName = "output";
 
-        private static async Task Main(string[] args)
+        private static readonly JTokenType[] SimpleTypes =
         {
-            var currentDirectory = Directory.GetCurrentDirectory();
+            JTokenType.Boolean, 
+            JTokenType.Bytes, 
+            JTokenType.Date, 
+            JTokenType.Float,
+            JTokenType.Guid, 
+            JTokenType.Uri, 
+            JTokenType.Integer, 
+            JTokenType.String,
+            JTokenType.TimeSpan
+        };
+
+        private static readonly string[] ExcludedProperties =
+        {
+            "id",
+            "primary_",
+            "secondary_",
+            "vault_uri",
+            "fully_qualified_domain_name"
+        };
+
+        private static async Task Main()
+        {
+            var currentProjectDirectory =
+                Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"..\..\.."));
 
             var fileNames = Directory.EnumerateFiles(
-                currentDirectory,
+                currentProjectDirectory,
                 "*.tfstate",
                 SearchOption.TopDirectoryOnly
                 );
@@ -54,21 +76,17 @@ namespace TerraformStateToHcl
                     var attributeObj = JObject.Parse(attribute.ToString());
                     foreach (var property in attributeObj.Properties())
                     {
-                        if (property.Name.Equals("id", StringComparison.OrdinalIgnoreCase)) continue;
+                        if (ExcludedProperties.Any(prop => property.Name.StartsWith(prop, StringComparison.OrdinalIgnoreCase))) continue;
+
                         if (property.First.Type == JTokenType.Array)
                         {
                             if (property.Children().All(c => c.First == null)) continue;
 
-                            var elements = property.Value.ToArray();
-
-                            foreach (var element in elements)
+                            foreach (var child in property.First.Children())
                             {
                                 sb.AppendLine($"{property.Name} {{");
 
-                                foreach (var child in element.Children())
-                                {
-                                    AppendProperty((JProperty)child, sb);
-                                }
+                                AppendProperty(child, sb);
 
                                 sb.AppendLine("}");
                             }
@@ -98,78 +116,47 @@ namespace TerraformStateToHcl
             return stateFileObj;
         }
 
-        private static void AppendProperty(JProperty property, StringBuilder sb)
+        private static void AppendProperty(JToken token, StringBuilder sb)
         {
-            if (property.First.Type == JTokenType.Array)
+            switch (token.Type)
             {
-                foreach (var jToken in property.Children())
-                {
-                    //Traverse(jToken.First ?? jToken, property, sb);
-                    Traverse2(jToken, sb);
-                }
+                case JTokenType.Property:
+                    {
+                        var property = (JProperty) token;
 
-                return;
-            }
+                        if (property.Children().Any(c => c.Type == JTokenType.Array && c.Children().Any(cc => !SimpleTypes.Contains(cc.Type))))
+                        {
+                            sb.AppendLine($"{property.Name} {{");
 
-            var val = property.Value.ToString();
+                            AppendProperty(token.First, sb);
 
-            if (string.IsNullOrEmpty(val)) return;
+                            sb.AppendLine("}");
 
-            Append(property, sb);
-        }
+                            return;
+                        }
 
-        private static JTokenType[] _simpleTypes =
-        {
-            JTokenType.Boolean, JTokenType.Bytes, JTokenType.Date, JTokenType.Float,
-            JTokenType.Guid, JTokenType.Uri, JTokenType.Integer, JTokenType.String,
-            JTokenType.TimeSpan
-        };
-        private static void Traverse2(JToken token, StringBuilder sb)
-        {
-            if (_simpleTypes.Contains(token.Type))
-            {
-                Append(token as JProperty, sb);
-                return;
-            }
+                        Append(property, sb);
+                        break;
+                    }
+                case JTokenType.Array:
+                case JTokenType.Object:
+                    {
+                        foreach (var child in token.Children())
+                        {
+                            AppendProperty(child, sb);
+                        }
 
-            foreach (var child in token.Children())
-            {
-                Traverse2(child, sb);
+                        break;
+                    }
             }
         }
-
-        //private static void Traverse(JToken jToken, JProperty property, StringBuilder sb)
-        //{
-        //    if (jToken.Type != JTokenType.Array
-        //        && jToken.Type != JTokenType.Object
-        //        && jToken.Type != JTokenType.Property)
-        //    {
-        //        Append(property, sb);
-        //        return;
-        //    }
-
-        //    if (jToken.First?.Type != JTokenType.Array
-        //        && jToken.First?.Type != JTokenType.Object
-        //        && jToken.First?.Type != JTokenType.Property)
-        //    {
-        //        Append(property, sb);
-        //        return;
-        //    }
-
-        //    sb.AppendLine($"{property.Name} {{");
-
-        //    foreach (var child in jToken.Children())
-        //    {
-        //        var prop = child.Type == JTokenType.Property ? (JProperty) child : (JProperty) child.First;
-        //        Traverse(child.First ?? child, prop, sb);
-        //    }
-
-        //    sb.AppendLine("}");
-        //}
 
         private static void Append(JProperty property, StringBuilder sb)
         {
             var propertyValue = property.Value.ToString();
+
+            if (string.IsNullOrEmpty(propertyValue)) return;
+
             switch (property.First.Type)
             {
                 case JTokenType.Array:

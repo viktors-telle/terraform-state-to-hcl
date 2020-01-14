@@ -11,13 +11,13 @@
 
   <ItemGroup>
     <None Update="dev-key-vault.tfstate">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </None>
     <None Update="dev-resource-group.tfstate">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </None>
     <None Update="dev-storage.tfstate">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </None>
     <None Update="key-vault.tfstate">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
