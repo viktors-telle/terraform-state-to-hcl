@@ -11,6 +11,7 @@ namespace TerraformStateToHcl
     internal class Program
     {
         private const string OutputDirectoryName = "output";
+        private const string TerraformStateFileExtension = ".tfstate";
 
         private static readonly JTokenType[] SimpleTypes =
         {
@@ -25,32 +26,85 @@ namespace TerraformStateToHcl
             JTokenType.TimeSpan
         };
 
-        private static readonly string[] ExcludedProperties =
+        private static readonly string[] ExcludedPropertiesStartingWith =
         {
-            "id",
             "primary_",
             "secondary_",
+        };
+
+        private static readonly string[] ExcludedPropertiesExactMatch =
+        {
+            "id",
             "vault_uri",
-            "fully_qualified_domain_name"
+            "fully_qualified_domain_name",
+            "sku",
+            "secret_id",
+            "certificate_data",
+            "thumbprint",
+            "version",
+            "days_before_expiry",
+            "e",
+            "n",
+            "x",
+            "y",
+            "account_type"
         };
 
         private static async Task Main()
+        {
+            PrepareOutputDirectory();
+
+            //await new KeyVaultImporter().Import();
+
+            var fileNames = GetTerraformStateFileNames();
+
+            if (!fileNames.Any())
+            {
+                Console.WriteLine($"Terraform state files ({TerraformStateFileExtension}) do not exist in current directory.");
+                return;
+            }
+
+            foreach (var fileName in fileNames)
+            {
+                Console.WriteLine($"Processing {fileName}...");
+                await Transform(fileName);
+                Console.WriteLine($"Finished processing {fileName}.");
+            }
+
+            FormatResultFiles();
+        }
+
+        private static void PrepareOutputDirectory()
+        {
+            string[] extensionsToDelete = { ".txt", ".ps1", ".tfstate", ".backup" };
+            var terraformDirectory = Path.Combine(OutputDirectoryName, ".terraform");
+            if (Directory.Exists(terraformDirectory))
+            {
+                Directory.Delete(terraformDirectory, true);
+            }
+
+            var directory = new DirectoryInfo(OutputDirectoryName);
+
+            foreach (var file in directory
+                .EnumerateFiles()
+                .Where(d => extensionsToDelete.Contains(d.Extension.ToLowerInvariant())))
+            {
+                file.Delete(); 
+            }
+        }
+
+        private static string[] GetTerraformStateFileNames()
         {
             var currentProjectDirectory =
                 Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"..\..\.."));
 
             var fileNames = Directory.EnumerateFiles(
                 currentProjectDirectory,
-                "*.tfstate",
+                $"*{TerraformStateFileExtension}",
                 SearchOption.TopDirectoryOnly
-                );
+            );
 
-            foreach (var fileName in fileNames)
-            {
-                await Transform(fileName);
-            }
-
-            FormatFiles();
+            return fileNames.ToArray();
         }
 
         private static async Task Transform(string fileName)
@@ -68,7 +122,7 @@ namespace TerraformStateToHcl
                 foreach (var instance in resource["instances"])
                 {
                     sb.AppendLine(instance["index_key"] != null
-                        ? $@"resource ""{resource["type"]}"" ""{resource["name"]}_{instance["index_key"]}"" {{"
+                        ? $@"resource ""{resource["type"]}"" ""{instance["index_key"]}"" {{"
                         : $@"resource ""{resource["type"]}"" ""{resource["name"]}"" {{");
 
                     var attribute = instance["attributes"];
@@ -76,9 +130,10 @@ namespace TerraformStateToHcl
                     var attributeObj = JObject.Parse(attribute.ToString());
                     foreach (var property in attributeObj.Properties())
                     {
-                        if (ExcludedProperties.Any(prop => property.Name.StartsWith(prop, StringComparison.OrdinalIgnoreCase))) continue;
+                        if (ContainsExcludedProperty(property)) continue;
 
-                        if (property.First.Type == JTokenType.Array)
+                        if (property.First.Type == JTokenType.Array
+                            && !property.First.Children().All(c => SimpleTypes.Contains(c.Type)))
                         {
                             if (property.Children().All(c => c.First == null)) continue;
 
@@ -123,6 +178,13 @@ namespace TerraformStateToHcl
                 case JTokenType.Property:
                     {
                         var property = (JProperty) token;
+
+                        if (ContainsExcludedProperty(property)) return;
+
+                        if (property.Value.ToString().Equals("[]"))
+                        {
+                            return;
+                        }
 
                         if (property
                             .Children()
@@ -175,17 +237,22 @@ namespace TerraformStateToHcl
             }
         }
 
+        private static bool ContainsExcludedProperty(JProperty property)
+        {
+            return ExcludedPropertiesStartingWith
+                       .Any(prop => property.Name.StartsWith(prop, StringComparison.OrdinalIgnoreCase))
+                   ||
+                   ExcludedPropertiesExactMatch
+                       .Any(prop => prop.Equals(property.Name, StringComparison.OrdinalIgnoreCase));
+
+        }
+
         private static async Task SaveFile(string outputFileName, string result)
         {
-            if (!Directory.Exists(OutputDirectoryName))
-            {
-                Directory.CreateDirectory(OutputDirectoryName);
-            }
-
             await File.WriteAllTextAsync($"{OutputDirectoryName}/{outputFileName}.tf", result, Encoding.UTF8);
         }
 
-        private static void FormatFiles()
+        private static void FormatResultFiles()
         {
             using var terraform = new Process
             {
