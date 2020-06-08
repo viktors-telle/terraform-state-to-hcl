@@ -12,12 +12,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="dev-resource-group.tfstate">
-      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </None>
-    <None Update="dev-storage.tfstate">
-      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </None>
     <None Update="key-vault.tfstate">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
@@ -28,15 +22,6 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="modules\key-vault\variables.tf">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="output\main.tf">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="output\modules\key-vault\main.tf">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="output\modules\key-vault\variables.tf">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>

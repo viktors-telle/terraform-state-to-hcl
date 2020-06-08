@@ -8,20 +8,20 @@ using Newtonsoft.Json.Linq;
 
 namespace TerraformStateToHcl
 {
-    internal class Program
+    public class JsonToHclConverter
     {
         private const string OutputDirectoryName = "output";
         private const string TerraformStateFileExtension = ".tfstate";
 
         private static readonly JTokenType[] SimpleTypes =
         {
-            JTokenType.Boolean, 
-            JTokenType.Bytes, 
-            JTokenType.Date, 
+            JTokenType.Boolean,
+            JTokenType.Bytes,
+            JTokenType.Date,
             JTokenType.Float,
-            JTokenType.Guid, 
-            JTokenType.Uri, 
-            JTokenType.Integer, 
+            JTokenType.Guid,
+            JTokenType.Uri,
+            JTokenType.Integer,
             JTokenType.String,
             JTokenType.TimeSpan
         };
@@ -50,24 +50,21 @@ namespace TerraformStateToHcl
             "account_type"
         };
 
-        private static async Task Main()
+        public async Task Convert()
         {
             PrepareOutputDirectory();
-
-            //await new KeyVaultImporter().Import();
-
             var fileNames = GetTerraformStateFileNames();
 
             if (!fileNames.Any())
             {
-                Console.WriteLine($"Terraform state files ({TerraformStateFileExtension}) do not exist in current directory.");
+                Console.WriteLine($"Terraform state files ({TerraformStateFileExtension}) do not exist in the current directory.");
                 return;
             }
 
             foreach (var fileName in fileNames)
             {
                 Console.WriteLine($"Processing {fileName}...");
-                await Transform(fileName);
+                await Convert(fileName);
                 Console.WriteLine($"Finished processing {fileName}.");
             }
 
@@ -76,21 +73,12 @@ namespace TerraformStateToHcl
 
         private static void PrepareOutputDirectory()
         {
-            string[] extensionsToDelete = { ".txt", ".ps1", ".tfstate", ".backup" };
-            var terraformDirectory = Path.Combine(OutputDirectoryName, ".terraform");
-            if (Directory.Exists(terraformDirectory))
+            if (Directory.Exists(OutputDirectoryName))
             {
-                Directory.Delete(terraformDirectory, true);
+                Directory.Delete(OutputDirectoryName, true);
             }
 
-            var directory = new DirectoryInfo(OutputDirectoryName);
-
-            foreach (var file in directory
-                .EnumerateFiles()
-                .Where(d => extensionsToDelete.Contains(d.Extension.ToLowerInvariant())))
-            {
-                file.Delete(); 
-            }
+            Directory.CreateDirectory(OutputDirectoryName);
         }
 
         private static string[] GetTerraformStateFileNames()
@@ -107,7 +95,7 @@ namespace TerraformStateToHcl
             return fileNames.ToArray();
         }
 
-        private static async Task Transform(string fileName)
+        private static async Task Convert(string fileName)
         {
             var outputFileName = string.Empty;
 
@@ -171,25 +159,29 @@ namespace TerraformStateToHcl
             return stateFileObj;
         }
 
+        private static bool ContainsExcludedProperty(JProperty property)
+        {
+            return ExcludedPropertiesStartingWith
+                       .Any(prop => property.Name.StartsWith(prop, StringComparison.OrdinalIgnoreCase))
+                   ||
+                   ExcludedPropertiesExactMatch
+                       .Any(prop => prop.Equals(property.Name, StringComparison.OrdinalIgnoreCase));
+        }
+
         private static void AppendProperty(JToken token, StringBuilder sb)
         {
             switch (token.Type)
             {
                 case JTokenType.Property:
                     {
-                        var property = (JProperty) token;
+                        var property = (JProperty)token;
 
                         if (ContainsExcludedProperty(property)) return;
-
-                        if (property.Value.ToString().Equals("[]"))
-                        {
-                            return;
-                        }
 
                         if (property
                             .Children()
                             .Any(c => c.Type == JTokenType.Array && c.Children()
-                                          .Any(cc => !SimpleTypes.Contains(cc.Type))))
+                                .Any(cc => !SimpleTypes.Contains(cc.Type))))
                         {
                             sb.AppendLine($"{property.Name} {{");
 
@@ -235,16 +227,6 @@ namespace TerraformStateToHcl
                     sb.AppendLine($"{property.Name} = \"{propertyValue}\"");
                     break;
             }
-        }
-
-        private static bool ContainsExcludedProperty(JProperty property)
-        {
-            return ExcludedPropertiesStartingWith
-                       .Any(prop => property.Name.StartsWith(prop, StringComparison.OrdinalIgnoreCase))
-                   ||
-                   ExcludedPropertiesExactMatch
-                       .Any(prop => prop.Equals(property.Name, StringComparison.OrdinalIgnoreCase));
-
         }
 
         private static async Task SaveFile(string outputFileName, string result)
